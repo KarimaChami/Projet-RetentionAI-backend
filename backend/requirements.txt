@@ -1,0 +1,16 @@
+fastapi 
+uvicorn
+pydantic
+pytest
+requests
+passlib[bcrypt]
+psycopg2-binary
+python-jose
+dotenv
+sqlalchemy
+alembic
+python-multipart
+httpx
+argon2-cffi
+pytest-mock
+jwt
