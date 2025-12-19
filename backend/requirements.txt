@@ -1,4 +1,4 @@
-fastapi 
+fastapi
 uvicorn
 pydantic
 pytest
@@ -14,3 +14,11 @@ httpx
 argon2-cffi
 pytest-mock
 jwt
+email-validator
+imbalanced-learn==0.12.4
+numpy==1.26.4
+pandas==2.2.2
+matplotlib==3.8.4
+seaborn==0.13.2
+scikit-learn==1.5.2
+joblib==1.4.2

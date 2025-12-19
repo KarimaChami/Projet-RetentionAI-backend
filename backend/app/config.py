@@ -9,5 +9,4 @@ class Settings:
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 30
     HF_API_TOKEN = os.getenv("HF_API_TOKEN")
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 settings = Settings()
