@@ -32,7 +32,7 @@ class Employee(Base):
     YearsInCurrentRole = Column(Integer, nullable=False)
     YearsWithCurrManager = Column(Integer, nullable=False)
     
-    prediction_history = relationship("Prediction_history" , back_populates="employee")
+    predictions = relationship("Prediction_history" , back_populates="employee")
     
    
     

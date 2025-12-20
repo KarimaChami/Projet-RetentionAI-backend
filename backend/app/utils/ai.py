@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import json
 load_dotenv()
 
-HF_TOKEN = os.getenv("HF_TOKEN")
+HF_TOKEN = os.getenv("HF_API_TOKEN")
 
 API_URL = "https://router.huggingface.co/v1/chat/completions"
 HEADERS = {
@@ -67,3 +67,4 @@ WorkLifeBalance: {payload["WorkLifeBalance"]}
     except Exception as e:
         print("Error parsing HF response:", e)
         return {"retention_plan": []}  # fallback si erreur
+print("HF_TOKEN:", os.getenv("HF_TOKEN"))

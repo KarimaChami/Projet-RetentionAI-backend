@@ -13,4 +13,4 @@ class PredictionHistory(Base):
     employee_id = Column(Integer)
     probability = Column(Float)
     user = relationship("User", back_populates="predictions")
-    employe = relationship("Employe", back_populates="predictions")
+    # employe = relationship("Employe", back_populates="predictions")

@@ -11,8 +11,6 @@ from sqlalchemy.orm import Session
 from backend.app.models.user import User
 from backend.app.schemas.user import UserCreate
 from passlib.hash import argon2
-# from backend.app.models.employer import Employee
-# from backend.app.models.prediction_his import Prediction_history
 
 
 # Password hashing
@@ -90,33 +88,3 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
  
 
 
-
-# create employee
-
-# def create_employee(employee , db):
-#     new_employee = Employee(**employee.model_dump())
-    
-#     db.add(new_employee)
-#     db.commit()
-#     db.refresh(new_employee)
-    
-#     return new_employee
-
-
-
-
-# create history
-
-# def create_history(userid , employeeid  , proba , db):
-    
-#     new_history = Prediction_history(
-#         user_id = userid ,
-#         employee_id = employeeid,
-#         probability = proba
-#     )
-    
-#     db.add(new_history)
-#     db.commit()
-#     db.refresh(new_history)
-    
-#     return new_history

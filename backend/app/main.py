@@ -3,6 +3,7 @@ from fastapi import FastAPI
 import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.database import engine, Base,get_db
+from backend.app.models.prediction_his import PredictionHistory
 from backend.app.schemas.user import UserCreate
 from backend.app.schemas.token import Token 
 from backend.app.models.user import User
@@ -12,17 +13,11 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from starlette import status
-# from backend.app.schemas.employer import EmployeBase
-# from backend.app.schemas.prediction import PredictionResponse
 from backend.app.schemas.retention import RetentionPlan
-# from backend.app.models.prediction_his import PredictionHistory
-from backend.app.utils.ml import predict_churn
 from backend.app.utils.ai import generate_plan
-# from backend.app.schemas.employer import EmployeBase
-# from backend.app.models.employer import Employee
 from backend.app.schemas.employer import EmployeBase
 from backend.app.utils.ml import pipeline as model
-
+from backend.app.schemas.retention import RetentionPlanRequest
 Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
@@ -62,61 +57,110 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @app.post('/predict')
-def predict(employe: EmployeBase, db: Session = Depends(get_db)):
-    FEATURE_COLUMNS = [
-    "Age",
-    "BusinessTravel",
-    "Department",
-    "Education",
-    "EducationField",
-    "Gender",
-    "JobInvolvement",
-    "JobLevel",
-    "JobRole",
-    "MonthlyRate",
-    "MaritalStatus",
-    "MonthlyIncome",
-    "MonthlyRate",
-    "NumCompaniesWorked",
-    "PercentSalaryHike",
-    "OverTime",
-    "PerformanceRating",
-    "StockOptionLevel",
-    "TotalWorkingYears",
-    "WorkLifeBalance",
-    "YearsAtCompany",
-    "YearsInCurrentRole",
-    "YearsWithCurrManager"
-    ]
-    data_dict = employe.dict()
-    X = pd.DataFrame([data_dict], columns=FEATURE_COLUMNS)
-
-    prediction = model.predict(X)[0]
-    probability = model.predict_proba(X)[0][1]
-
-    return {
-        "prediction": int(prediction),
-        "probability": float(probability)
-    }
+async def predict_churn(employee: EmployeBase,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Prédire la probabilité de départ d'un employé
     
+    Nécessite une authentification JWT.
     
-
-# @app.post("/generate_retention_plan", response_model=RetentionPlan)
-# def generate_retention_plan(request:RetentionPlan , db: Session = Depends(get_db)):
-#     plan = generate_plan(request.dict())
-#     return plan
-
+    Parameters:
+        - age: Âge de l'employé (18-100)
+        - department: Département (IT, Sales, HR, Marketing, Finance, Operations, R&D)
+        - job_role: Rôle dans l'entreprise
+        - years_at_company: Nombre d'années dans l'entreprise
+        - monthly_income: Salaire mensuel en euros
+        - job_satisfaction: Satisfaction au travail (1-5)
+        - work_life_balance: Équilibre vie pro/perso (1-5)
+        - performance_rating: Note de performance (1-5)
+        - business_travel: Fréquence des voyages (Non-Travel, Travel_Rarely, Travel_Frequently)
+        - over_time: Heures supplémentaires (Yes/No)
+        - distance_from_home: Distance domicile-travail en km
+        - employee_id: Identifiant employé (optionnel)
+    
+    Returns:
+        Probabilité de départ et niveau de risque
+    """
+    try:
+        # Convertir en dictionnaire pour le modèle
+        employee_df = pd.DataFrame([employee.dict()]) 
+        # Probabilité de churn
+        probability = model.predict_proba(employee_df)[0][1]  # Classe 1
+        
+        # Niveau de risque
+        if probability < 0.3:
+            risk_level = "Low"
+        elif probability < 0.6:
+            risk_level = "Medium"
+        else:
+            risk_level = "High"
+        
+        # Enregistrer dans l'historique
+        prediction = PredictionHistory(
+            user_id=current_user.id,
+            probability=probability,
+        )
+        
+        db.add(prediction)
+        db.commit()
+        db.refresh(prediction)
+        
+        return {
+            "churn_probability": round(probability, 4),
+            "risk_level": risk_level,
+            "timestamp": prediction.timestamp,
+            "prediction_id": prediction.id
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur de prédiction: {str(e)}"
+        )
 @app.post("/generate-retention-plan", response_model=RetentionPlan)
-def generate_retention_plan_endpoint(employee: EmployeBase, db: Session = Depends(get_db)):
+async def generate_retention_plan(
+    request: RetentionPlanRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if request.churn_probability < 0.5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le plan de rétention n'est généré que pour une probabilité > 50%"
+        )
 
-    proba = predict_churn(employee.dict())
-    payload = employee.dict()
-    payload["probability"] = proba
-    payload["prediction"] = 1 if proba > 0.5 else 0  # <-- ajouter ceci
-    plan_dict = generate_plan(payload)
+    try:
+        # Préparer le payload pour la fonction
+        payload = request.employee_data.dict()
+        payload["probability"] = request.churn_probability
+        print("DEBUG PAYLOAD:", payload)  # Vérifier que "probability" est bien présent
 
-    return RetentionPlan(**plan_dict)
+        # Appel de la fonction generate_plan
+        actions = generate_plan(payload)["retention_plan"]
+
+        # Sauvegarder dans la DB (facultatif)
+        last_prediction = db.query(PredictionHistory)\
+            .filter(PredictionHistory.user_id == current_user.id)\
+            .order_by(PredictionHistory.timestamp.desc())\
+            .first()
+        
+        if last_prediction:
+            last_prediction.retention_plan = "\n".join(actions)
+            db.commit()
+
+        return {"retention_plan": actions}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur de génération du plan: {str(e)}"
+        )
+
+
 
 
 
