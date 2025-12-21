@@ -7,3 +7,5 @@ venv/
 .gitignore
 **/.pytest_cache
 tests/
+alembic/
+alembic.ini

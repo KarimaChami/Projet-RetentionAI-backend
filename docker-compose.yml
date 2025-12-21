@@ -16,7 +16,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: backend_app
     env_file:
@@ -25,13 +25,13 @@ services:
       - "8000:8000"
     depends_on:
       - db
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
-      context: ../Plateforme-Fullstack-d-Orchestration-IA-frontend/frontend
+      context: ../Projet-RetentionAI-frontend/frontend
       dockerfile: Dockerfile
-    container_name: front
+    container_name: front_app
     ports:
       - "3000:3000"
     environment:
